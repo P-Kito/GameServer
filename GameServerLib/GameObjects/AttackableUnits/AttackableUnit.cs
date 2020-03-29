@@ -84,6 +84,7 @@ namespace LeagueSandbox.GameServer.GameObjects.AttackableUnits
 
         public virtual void Die(IAttackableUnit killer)
         {
+            IsDead = true;
             SetToRemove();
             _game.ObjectManager.StopTargeting(this);
 
@@ -106,6 +107,9 @@ namespace LeagueSandbox.GameServer.GameObjects.AttackableUnits
 
             if (killer != null && killer is IChampion champion)
                 champion.OnKill(this);
+
+            for (ShieldType shield = 0; shield < ShieldType.END; shield++)
+                SetShieldAmount(shield, 0);
         }
 
         public virtual bool IsInDistress()
@@ -169,16 +173,12 @@ namespace LeagueSandbox.GameServer.GameObjects.AttackableUnits
                     throw new ArgumentOutOfRangeException(nameof(source), source, null);
             }
             
-            if (useShield && ShieldAmount[(int)shieldType] > 0)
+            if (useShield && GetShieldAmount(shieldType) > 0)
             {
-                float shieldAmount = ShieldAmount[(int)shieldType];
                 ApplyShield(-damage, shieldType, false);
-                damage -= shieldAmount;
-                if (ShieldAmount[(int)shieldType] < 0)
-                {
-                    ShieldAmount[(int)shieldType] = 0;
-                    useShield = false;
-                }
+                damage -= GetShieldAmount(shieldType);
+                if (GetShieldAmount(shieldType) < 0)
+                    ApplyShield(0, shieldType, false);
             }
 
             if (damage < 0f)
@@ -194,18 +194,7 @@ namespace LeagueSandbox.GameServer.GameObjects.AttackableUnits
 
             Stats.CurrentHealth = Math.Max(0.0f, Stats.CurrentHealth - damage);
             if (!IsDead && Stats.CurrentHealth <= 0)
-            {
-                IsDead = true;
                 Die(attacker);
-                for (ShieldType shield = 0; shield < ShieldType.END;shield++)
-                    {
-                        if (useShield && ShieldAmount[(int)shield] > 0)
-                        {
-                            ApplyShield(-ShieldAmount[(int)shield], shield, true);
-                            useShield = false;
-                        }
-                    }
-            }
 
             int attackerId = 0, targetId = 0;
 
@@ -291,6 +280,16 @@ namespace LeagueSandbox.GameServer.GameObjects.AttackableUnits
                     Stats.IsTargetableToTeam &= ~SpellFlags.NonTargetableEnemy;
                 }
             }
+        }
+
+        public int GetShieldAmount(ShieldType type)
+        {
+            return ShieldAmount[(int)type];
+        }
+
+        public void SetShieldAmount(ShieldType type, float amount)
+        {
+            ShieldAmount[(int)type] = (int)amount;
         }
 
         public void ApplyShield(float amount, ShieldType shieldType, bool noFade)
